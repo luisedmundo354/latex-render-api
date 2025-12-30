@@ -17,10 +17,27 @@ def _run(cmd: list[str], cwd: Path, timeout_s: int) -> str:
     return p.stdout
 
 
+def _has_documentclass(path: Path) -> bool:
+    try:
+        text = path.read_text(errors="ignore")
+    except Exception:
+        return False
+    return "\\documentclass" in text
+
+
 def _pick_main_tex(workdir: Path) -> Path:
     # Convention: main.tex at root
-    if (workdir / "main.tex").exists():
-        return workdir / "main.tex"
+    main = workdir / "main.tex"
+    if main.exists():
+        return main
+
+    # Prefer files that declare \documentclass (likely entrypoints)
+    docclass_tex = [p for p in workdir.rglob("*.tex") if _has_documentclass(p)]
+    if len(docclass_tex) == 1:
+        return docclass_tex[0]
+    if len(docclass_tex) > 1:
+        docclass_tex.sort(key=lambda p: len(str(p)))
+        return docclass_tex[0]
 
     # If exactly one .tex at root, use it
     root_tex = list(workdir.glob("*.tex"))
@@ -52,7 +69,13 @@ def compile_zip_bytes_to_pdf(zip_bytes: bytes) -> bytes:
         stem = main_tex.stem
         tex_name = main_tex.name
 
-        base_cmd = ["pdflatex", "-interaction=nonstopmode", "-halt-on-error", "-no-shell-escape", tex_name]
+        base_cmd = [
+            "pdflatex",
+            "-interaction=nonstopmode",
+            "-halt-on-error",
+            "-no-shell-escape",
+            tex_name,
+        ]
 
         logs = ""
         # pass 1
