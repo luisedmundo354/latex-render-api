@@ -12,10 +12,11 @@ def _run(cmd: list[str], cwd: Path, timeout_s: int) -> str:
         cwd=str(cwd),
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
-        text=True,
         timeout=timeout_s,
     )
-    return p.stdout
+    out = p.stdout or b""
+    # Tool output isn't always valid UTF-8; avoid crashing on decode.
+    return out.decode("utf-8", errors="replace")
 
 
 def _read_text(path: Path) -> str:
